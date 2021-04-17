@@ -27,11 +27,13 @@ import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.servlet.SolrDispatchFilter;
+import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.util.TimeZoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +61,7 @@ public class SolrRequestInfo {
     // TODO: temporary sanity check... this can be changed to just an assert in the future
     SolrRequestInfo prev = threadLocal.get();
     if (prev != null) {
-      log.error("Previous SolrRequestInfo was not closed!  req={}", prev.req.getOriginalParams());
+      log.error("Previous SolrRequestInfo was not closed!  req={}", prev.req);
       log.error("prev == info : {}", prev.req == info.req, new RuntimeException());
     }
     assert prev == null;
@@ -81,6 +83,8 @@ public class SolrRequestInfo {
       }
     } finally {
       threadLocal.remove();
+      AddUpdateCommand.THREAD_LOCAL_AddUpdateCommand.remove();
+      SolrInputDocument.THREAD_LOCAL_SolrInputDocument.remove();
     }
   }
 

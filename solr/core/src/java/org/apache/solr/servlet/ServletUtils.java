@@ -17,6 +17,7 @@
 
 package org.apache.solr.servlet;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletRequest;
 
 /**
@@ -33,5 +34,7 @@ public abstract class ServletUtils {
    */
   public static String getPathAfterContext(HttpServletRequest request) {
     return request.getServletPath() + (request.getPathInfo() != null ? request.getPathInfo() : "");
+//    Object pathInfo = request.getAttribute(AsyncContext.ASYNC_PATH_INFO);
+//    return (String) request.getAttribute(AsyncContext.ASYNC_SERVLET_PATH) + (pathInfo != null ? pathInfo : "");
   }
 }

@@ -160,6 +160,7 @@ public class QueryComponent extends SearchComponent
     try {
       QParser parser = QParser.getParser(rb.getQueryString(), defType, req);
       Query q = parser.getQuery();
+
       if (q == null) {
         // normalize a null query to a query that matches nothing
         q = new MatchNoDocsQuery();

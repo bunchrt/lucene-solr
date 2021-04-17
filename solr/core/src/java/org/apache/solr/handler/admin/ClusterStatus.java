@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.admin;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,8 +43,13 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ClusterStatus {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   private final ZkStateReader zkStateReader;
   private final ZkNodeProps message;
   private final String collection; // maybe null
@@ -61,21 +67,19 @@ public class ClusterStatus {
     Aliases aliases = zkStateReader.getAliases();
     Map<String, List<String>> collectionVsAliases = new HashMap<>();
     Map<String, List<String>> aliasVsCollections = aliases.getCollectionAliasListMap();
-    for (Map.Entry<String, List<String>> entry : aliasVsCollections.entrySet()) {
-      String alias = entry.getKey();
-      List<String> colls = entry.getValue();
+    aliasVsCollections.forEach((alias, colls) -> {
       for (String coll : colls) {
-        if (collection == null || collection.equals(coll))  {
+        if (collection == null || collection.equals(coll)) {
           List<String> list = collectionVsAliases.computeIfAbsent(coll, k -> new ArrayList<>());
           list.add(alias);
         }
       }
-    }
+    });
 
     @SuppressWarnings({"rawtypes"})
     Map roles = null;
     if (zkStateReader.getZkClient().exists(ZkStateReader.ROLES, true)) {
-      roles = (Map) Utils.fromJSON(zkStateReader.getZkClient().getData(ZkStateReader.ROLES, null, null, true));
+      roles = (Map) Utils.fromJSON(zkStateReader.getZkClient().getData(ZkStateReader.ROLES, null, (Stat) null, true));
     }
 
     ClusterState clusterState = zkStateReader.getClusterState();
@@ -135,13 +139,10 @@ public class ClusterStatus {
         requestedShards.addAll(Arrays.asList(paramShards));
       }
 
-      if (clusterStateCollection.getStateFormat() > 1) {
-        bytes = Utils.toJSON(clusterStateCollection);
-        Map<String, Object> docCollection = (Map<String, Object>) Utils.fromJSON(bytes);
-        collectionStatus = getCollectionStatus(docCollection, name, requestedShards);
-      } else {
-        collectionStatus = getCollectionStatus((Map<String, Object>) stateMap.get(name), name, requestedShards);
-      }
+
+      bytes = Utils.toJSON(clusterStateCollection);
+      Map<String, Object> docCollection = (Map<String, Object>) Utils.fromJSON(bytes);
+      collectionStatus = getCollectionStatus(docCollection, name, requestedShards);
 
       collectionStatus.put("znodeVersion", clusterStateCollection.getZNodeVersion());
       if (collectionVsAliases.containsKey(name) && !collectionVsAliases.get(name).isEmpty()) {
@@ -159,6 +160,7 @@ public class ClusterStatus {
 
     List<String> liveNodes = zkStateReader.getZkClient().getChildren(ZkStateReader.LIVE_NODES_ZKNODE, null, true);
 
+
     // now we need to walk the collectionProps tree to cross-check replica state with live nodes
     crossCheckReplicaStateWithLiveNodes(liveNodes, collectionProps);
 
@@ -166,8 +168,7 @@ public class ClusterStatus {
     clusterStatus.add("collections", collectionProps);
 
     // read cluster properties
-    @SuppressWarnings({"rawtypes"})
-    Map clusterProps = zkStateReader.getClusterProperties();
+    Map<String, Object> clusterProps = zkStateReader.getClusterProperties();
     if (clusterProps != null && !clusterProps.isEmpty())  {
       clusterStatus.add("properties", clusterProps);
     }
@@ -185,6 +186,8 @@ public class ClusterStatus {
 
     // add live_nodes
     clusterStatus.add("live_nodes", liveNodes);
+
+
 
     results.add("cluster", clusterStatus);
   }
@@ -209,6 +212,10 @@ public class ClusterStatus {
       return collection;
     } else {
       Map<String, Object> shards = (Map<String, Object>) collection.get("shards");
+      if (shards == null)  {
+        log.error("Illegal state detected, shards is null collection={}", collection);
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Illegal state detected, shards is null collection=" + collection);
+      }
       Map<String, Object>  selected = new HashMap<>();
       for (String selectedShard : requestedShards) {
         if (!shards.containsKey(selectedShard)) {
@@ -255,6 +262,4 @@ public class ClusterStatus {
       }
     }
   }
-
-
 }

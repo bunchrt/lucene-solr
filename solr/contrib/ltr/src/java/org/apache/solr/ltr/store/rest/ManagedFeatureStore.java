@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
@@ -67,7 +68,7 @@ public class ManagedFeatureStore extends ManagedResource implements ManagedResou
   /** name of the attribute containing the feature store used **/
   static final String FEATURE_STORE_NAME_KEY = "store";
 
-  private final Map<String,FeatureStore> stores = new HashMap<>();
+  private final Map<String,FeatureStore> stores = new ConcurrentHashMap<>();
 
   /**
    * Managed feature store: the name of the attribute containing all the feature
@@ -89,14 +90,12 @@ public class ManagedFeatureStore extends ManagedResource implements ManagedResou
 
   }
 
-  public synchronized FeatureStore getFeatureStore(String name) {
+  public FeatureStore getFeatureStore(String name) {
     if (name == null) {
       name = FeatureStore.DEFAULT_FEATURE_STORE_NAME;
     }
-    if (!stores.containsKey(name)) {
-      stores.put(name, new FeatureStore(name));
-    }
-    return stores.get(name);
+
+    return stores.computeIfAbsent(name, fname -> new FeatureStore(fname));
   }
 
   @Override
@@ -115,7 +114,7 @@ public class ManagedFeatureStore extends ManagedResource implements ManagedResou
     }
   }
 
-  public synchronized void addFeature(Map<String,Object> map, String featureStore) {
+  public void addFeature(Map<String,Object> map, String featureStore) {
     log.info("register feature based on {}", map);
     final FeatureStore fstore = getFeatureStore(featureStore);
     final Feature feature = fromFeatureMap(solrResourceLoader, map);
@@ -148,10 +147,8 @@ public class ManagedFeatureStore extends ManagedResource implements ManagedResou
   }
 
   @Override
-  public synchronized void doDeleteChild(BaseSolrResource endpoint, String childId) {
-    if (stores.containsKey(childId)) {
-      stores.remove(childId);
-    }
+  public void doDeleteChild(BaseSolrResource endpoint, String childId) {
+    stores.remove(childId);
     storeManagedData(applyUpdatesToManagedData(null));
   }
 

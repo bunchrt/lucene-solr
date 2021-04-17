@@ -19,6 +19,7 @@ package org.apache.solr.schema;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -177,6 +178,7 @@ public abstract class FieldType extends FieldProperties {
     if (schemaVersion < 1.1f) properties |= MULTIVALUED;
     if (schemaVersion > 1.1f) properties |= OMIT_TF_POSITIONS;
     if (schemaVersion < 1.3) {
+      args = new HashMap<>(args);
       args.remove("compressThreshold");
     }
     if (schemaVersion >= 1.6f) properties |= USE_DOCVALUES_AS_STORED;
@@ -1119,9 +1121,7 @@ public abstract class FieldType extends FieldProperties {
       }
     } else { // Don't show defaults
       Set<String> fieldProperties = new HashSet<>();
-      for (String propertyName : FieldProperties.propertyNames) {
-        fieldProperties.add(propertyName);
-      }
+      fieldProperties.addAll(Arrays.asList(FieldProperties.propertyNames));
 
       for (Map.Entry<String, String> entry : args.entrySet()) {
         String key = entry.getKey();
